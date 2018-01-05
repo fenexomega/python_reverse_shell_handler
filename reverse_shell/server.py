@@ -2,6 +2,9 @@
 
 import socket 
 import threading
+import time
+import sys
+import select
 
 running = True
 HOST = 'localhost'
@@ -21,23 +24,48 @@ class ReadThread(threading.Thread):
         global running
         try:
             while running:
-                msg = self.conn.recv(1024)
+                msg = self.conn.recv(BUFFER)
                 msg = msg.decode('utf8')
                 print(msg,end='')
                 if msg == '':
-                    print("FECHOU. Pressione Enter para Sair")
+                    print("FECHOU.")
                     running = False
                     break
         except:
+            pass
+        finally:
             self.conn.close()
 
+class WriteThread(threading.Thread):
+    def __init__(self,conn):
+        threading.Thread.__init__(self)
+        self.conn = conn
+    def run(self):
+        global running
+        try:
+            while running:
+                time.sleep(0.05)
+                if select.select([sys.stdin,],[],[],0.0)[0]:
+                    c = input() + '\n'
+                    self.conn.send(c.encode())
+                    sys.stdin.flush()
+                
+        except:
+            print("Connection Exited")
+        finally:
+            running = False
+            self.conn.close()
+
+
+print("connection received from {}".format(ip))
 t1 = ReadThread(connection)
 t1.start()
+t2 = WriteThread(connection)
+t2.start()
 
 try:
-    while running:
-        command = input()
-        connection.sendall((command + '\n').encode())
+    t1.join()
+    t2.join()
 finally:
     connection.close()
     tcp.close()
